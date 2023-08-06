@@ -8,12 +8,19 @@ users = 100;
 preambs = 20;
 grants = 8;
 p_det = 1;
-p_det_col = 1;
-
+p_det_col = 0.5;
+experiments =5000;
+simple_equation1 = zeros (1, users);
+simple_equation2 = zeros (1, users);
 for j = 1:users
+    p1 = j * (1/preambs)*((1 - 1/preambs)^(j-1));
+    p0 = (1-1/preambs)^j;
+    p_c = 1 - p1 -p0;
+    simple_equation1(j) = p_det*users*p1;
+    simple_equation2(j) = (1-p_det_col)*users*p_c;
     sumResult = 0;
     for i = 1:min(preambs,j)
-        result = Pr_k_v(j, preambs, i);  
+        result = Pr_d_v(j, preambs, i, p_det);  
         sumResult = sumResult + (result*min(i, grants)); %(result*i);
     end
     %sumResult = sumResult * ((1-1/preambs)^(users - 1));
@@ -25,7 +32,7 @@ for j = 1:users
     else
         error('Cannot open output file');
     end
-    calculate_probability(10000,j, preambs, grants, p_det, p_det_col);
+    calculate_probability(experiments,j, preambs, grants, p_det, p_det_col);
     papers_theory(j, preambs, grants, p_det, p_det_col);
 end
 
@@ -37,14 +44,28 @@ th_real = load('th_real.txt');
 th_paper = load('th_paper.txt');
 model = load('model.txt');
 x = 1:length(model);
+simple_equation3 = simple_equation2 + simple_equation1;
 figure; % create a new figure
-plot(x, model, "b",x,th_paper,"r",x,th_real,"g"); 
-%,
-xlabel('количсетво абонентов'); 
-ylabel('Требуемое количсетво грантов'); 
-title('Plot'); 
+plot(x,model,"b", x,th_paper,"r"); 
+%,x,th_real,"g",
+xlabel('Количество абонентов'); 
+ylabel('Среднее кол-во грантов'); 
+legend('Моделирование', 'Оценка')
+%'Точное значение',
+title(p_det); 
 grid on; 
 
+function result = Pr_d_v(n, V, k, p_det)
+result = 0;
+for i=k:min(V,n)
+    b = nchoosek(i,k);
+    b1 = b*(p_det^k);
+    b2 = (1-p_det)^(i-k);
+    pr_dk = b1*b2;
+    res = Pr_k_v(n, V, i);
+    result = result+ res*pr_dk;
+end
+end
 
 function [res] = Pr_k_v(n, V, k)
 res = 0;
@@ -86,7 +107,7 @@ function final_number = count_successes(number_of_users, number_of_preambles, nu
     grants = min(successful_preambles, number_of_grants);
     for i = 1:grants
         random_choice = randi([1, successful_preambles]);
-        if succ_preambles_after_errors(random_choice)== 1
+        if succ_preambles_after_errors(random_choice)== 1 ;%|| succ_preambles_after_errors(random_choice)== -1
             final_number = final_number + 1;
         end
     end
@@ -134,7 +155,9 @@ function p_tags = papers_theory(number_of_users, number_of_preambles, number_of_
     p_c = 1 - p1 -p0;
     p_without_errors = ((1-1/number_of_preambles)^(number_of_users - 1)) * min(1, number_of_grants/(p1*number_of_preambles));
     p_with_det = p_dec*((1-1/number_of_preambles)^(number_of_users - 1)) * min(1, number_of_grants/(p1*number_of_preambles*p_dec));
-    p_with_dec_col = p_dec*((1-1/number_of_preambles)^(number_of_users - 1)) * min(1, number_of_grants/(p1*number_of_preambles*p_dec + p_c*number_of_preambles*(1-p_dec_col)));
+    p2 = p_c/(p_c+p1);
+    p_with_dec_col = ((1-1/number_of_preambles)^(number_of_users - 1)) * min(1, (number_of_grants - number_of_preambles*p_c*(1-p_dec_col))/(p1*number_of_preambles));
+    p_with_dec_col1 = p_with_dec_col * ((p1*p_dec)/(p1*p_dec+p_c*(1-p_dec_col)));
     p_tags = p_with_dec_col*number_of_users;%*((p1*p_dec)/(p1*p_dec + p_c*(1-p_dec_col)));
     
     fid = fopen('th_paper.txt', 'a');
@@ -146,4 +169,3 @@ function p_tags = papers_theory(number_of_users, number_of_preambles, number_of_
         error('Cannot open output file');
     end
 end
-
