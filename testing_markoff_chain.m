@@ -1,8 +1,8 @@
-users = 11;
-preambs = 8;
+users = 20;
+preambs = 20;
 grants = 3;
 p_det = 0.7;
-p_det_col = 0.6;
+p_det_col = 0.8;
 
 
 model_results = double_model(50000, preambs, users,  p_det, p_det_col, grants)
@@ -36,7 +36,12 @@ function theory_res = markoff_chain(N, M, p_det, p_det_col, grants)
             counter = counter + 1;
         end
     end
-
+    if N<grants
+        grants = N;
+    end
+    if round(D) + round(C)<grants
+        grants = round(D) + round(C);
+    end
     result = probab_matrix^grants;
     total = b * result;
     total_matrix = zeros(round(D + 1), round(C + 1));
@@ -60,11 +65,6 @@ function theory_res = markoff_chain(N, M, p_det, p_det_col, grants)
 end
 
 function model_res = double_model(experiments, N, M, p_dec, p_dec_col, grants)
-    
-    successful_preambles = 0;
-    final_number = zeros(1, 3);
-    final_number_of_col = 0;
-    matrix = zeros(N+1, N+1);
     success = 0;
     false_success = 0;
     collision = 0;
@@ -93,8 +93,6 @@ function model_res = double_model(experiments, N, M, p_dec, p_dec_col, grants)
                 idle = idle + 1;
             end
         end
-
-        
         %matrix(success+1, collision+1) = matrix(success+1, collision+1) + 1;
     end
     success = success/experiments;
