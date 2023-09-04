@@ -1,12 +1,14 @@
-users = 20;
-preambs = 20;
-grants = 3;
+users = 19%27;
+preambs = 19%23;
+grants = 9;
 p_det = 0.7;
-p_det_col = 0.8;
+p_det_col = 0.6;
 
-
-model_results = double_model(50000, preambs, users,  p_det, p_det_col, grants)
-theory_results = markoff_chain(preambs, users, p_det, p_det_col, grants)
+for gr = 1:9
+    disp(gr);
+    model_results = double_model(50000, preambs, users,  p_det, p_det_col, gr)
+    theory_results = markoff_chain(preambs, users, p_det, p_det_col, gr)
+end
 
 function theory_res = markoff_chain(N, M, p_det, p_det_col, grants)
 
@@ -15,6 +17,7 @@ function theory_res = markoff_chain(N, M, p_det, p_det_col, grants)
     p_2 = 1 - p_0 - p_1;
     D = N * p_1 * p_det;
     C = N * p_2 * (1 - p_det_col);
+    
 
     num_of_nodes = round(D + 1) * round(C + 1);
     probab_matrix = zeros(num_of_nodes, num_of_nodes);
@@ -23,27 +26,45 @@ function theory_res = markoff_chain(N, M, p_det, p_det_col, grants)
     counter = 1;
     rest_of_d = D;
     rest_of_c = C;
-
-    for i = num_of_nodes:-1:1
-        if rest_of_c <= 0
-            rest_of_d = rest_of_d - 1;
-            rest_of_c = C;
-        end
-        if rest_of_d >= 0 && rest_of_c > 0 && counter< num_of_nodes - round(C)
-            probab_matrix(i, num_of_nodes - counter) = rest_of_c / (rest_of_c + rest_of_d);
-            probab_matrix(i, num_of_nodes - counter - round(C)) = rest_of_d / (rest_of_c + rest_of_d);
-            rest_of_c = rest_of_c - 1;
-            counter = counter + 1;
-        end
-    end
     if N<grants
         grants = N;
     end
     if round(D) + round(C)<grants
         grants = round(D) + round(C);
     end
-    result = probab_matrix^grants;
-    total = b * result;
+    for i = num_of_nodes:-1:1
+        if rest_of_c <= 0
+            rest_of_d = rest_of_d - 1;
+            rest_of_c = C;
+        end
+        if rest_of_d < 0
+            rest_of_d = D;
+        end
+        if rest_of_d >= 0 && rest_of_c > 0
+            if counter< num_of_nodes
+                probab_matrix(i, num_of_nodes - counter) = rest_of_c / (rest_of_c + rest_of_d);
+            else
+                probab_matrix(i, num_of_nodes - abs(num_of_nodes - counter)) = rest_of_c / (rest_of_c + rest_of_d);
+            end
+            if counter< num_of_nodes - round(C)
+                probab_matrix(i, num_of_nodes - counter - round(C)) = rest_of_d / (rest_of_c + rest_of_d);
+            else
+                probab_matrix(i, num_of_nodes - abs(num_of_nodes - counter - round(C))) = rest_of_d / (rest_of_c + rest_of_d);
+            end
+            rest_of_c = rest_of_c - 1;
+            counter = counter + 1;
+        end
+    end
+    %disp(probab_matrix);
+    result1 = b*probab_matrix;
+    for i = 2:grants
+        %summa = sum(result1)
+        result = result1 * probab_matrix;
+        result1 = result;
+    end
+    %total = b * result;
+    summa_theory = sum(result1)
+    
     total_matrix = zeros(round(D + 1), round(C + 1));
     line_counts = 0;
     rows_counts = 0;
@@ -52,7 +73,7 @@ function theory_res = markoff_chain(N, M, p_det, p_det_col, grants)
             line_counts = line_counts + 1;
             rows_counts = 0;
         end
-        total_matrix(line_counts+1, rows_counts+1) = total(i);
+        total_matrix(line_counts+1, rows_counts+1) = result1(i);
         rows_counts = rows_counts + 1;
     end
     %total_matrix = reshape(total, round(D + 1), round(C + 1));
@@ -128,6 +149,39 @@ function model_res = double_model(experiments, N, M, p_dec, p_dec_col, grants)
             grants_given(i,j) = grants_given(i,j)/experiments;
         end
     end
+    sum_model = sum(grants_given,1);
+    summa_model = sum(sum_model)
     %disp(grants_given);
     model_res = grants_given;
+end
+
+function results = just_d_c_model(experiments, D, C, grants)
+    success = D;
+    false_success = C;
+    if success + false_success<grants
+        grants = success + false_success;
+    end
+    grants_given = zeros(success + 1, false_success + 1);
+    for i =1:experiments
+        new_succ = success;
+        new_false_succ = false_success;
+        for j = 1:grants
+            random_grant = randi([1, new_succ + new_false_succ]);
+            %grants_given(random_grant) = 1;
+            if random_grant <= new_succ
+                new_succ = new_succ - 1;
+            else
+                new_false_succ = new_false_succ -1;
+            end
+        end
+        grants_given(new_succ+1,new_false_succ+1) = grants_given(new_succ+1,new_false_succ+1) + 1;
+    end
+    for i = 1:length(grants_given)
+        for j = 1:size(grants_given, 2)
+            grants_given(i,j) = grants_given(i,j)/experiments;
+        end
+    end
+    sum_model = sum(grants_given,1);
+    summa_model = sum(sum_model)
+    results = grants_given;
 end
